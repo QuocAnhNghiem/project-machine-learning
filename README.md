@@ -68,6 +68,12 @@ python prepare_real_data.py \
 
 ## Huấn luyện mô hình
 
+### Chạy bằng Docker Compose (EPL, chạy 1 lần rồi thoát)
+
+```bash
+docker compose run --rm epl
+```
+
 ### 1) Huấn luyện cơ bản
 
 ```bash
@@ -122,6 +128,8 @@ Sau khi chạy, các file kết quả nằm trong `outputs/`:
 - `loss_curve.png`: đường loss theo epoch
 - `threshold_sweep_*.csv`, `*_best.json`: kết quả quét ngưỡng
 - `hyperparam_search_accuracy.csv`, `hyperparam_search_accuracy_best.json`: kết quả grid search
+
+##
 
 ## Ghi chú
 
