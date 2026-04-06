@@ -1,0 +1,26 @@
+services:
+  epl:
+    build: .
+    image: epl-logreg
+    working_dir: /app
+    network_mode: host
+    volumes:
+      - ./:/app
+    command: bash -lc "python src/prepare_real_data.py --input-dir data/data-raw --output data/epl_real_features.csv && python src/train.py --data data/epl_real_features.csv --output-dir outputs"
+
+  thresholds:
+    image: epl-logreg
+    working_dir: /app
+    network_mode: host
+    volumes:
+      - ./:/app
+    command: bash -lc "python src/evaluate_thresholds.py --data data/epl_real_features.csv --split-mode season --start 0.55 --stop 0.75 --step 0.01 --output-dir outputs"
+
+  tune:
+    image: epl-logreg
+    working_dir: /app
+    network_mode: host
+    volumes:
+      - ./:/app
+    command: bash -lc "python src/tune_hyperparams.py --data data/epl_real_features.csv"
+  
