@@ -1,6 +1,24 @@
+# Python 
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+venv/
+env/
+.env
+
+# Tooling / Notebook
+.ipynb_checkpoints/
+
+# Model Output Logs
 outputs/*.png
 outputs/*.csv
 outputs/*.json
+
+# NodeJs (PDF Generator)
+presentation/node_modules/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store

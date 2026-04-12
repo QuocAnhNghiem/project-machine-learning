@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EPL Match Prediction — Logistic Regression</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] },
+    chtml: { matchFontHeight: false, displayAlign: 'left', displayIndent: '0' }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  /* ===== RESET & VARIABLES ===== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-dark: #0b0c10;
+    --bg-card: #1f2833;
+    --bg-card2: #16213e;
+    --accent: #66fcf1;
+    --accent2: #45a29e;
+    --accent3: #e94560;
+    --text: #ffffff;
+    --text-muted: #c5c6c7;
+    --green: #00e676;
+    --gold: #ffd700;
+    --blue: #29b6f6;
+    --pink: #ff4081;
+    --slide-w: 1280px;
+    --slide-h: 720px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #000;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* ===== SLIDE CONTAINER ===== */
+  .slide {
+    width: var(--slide-w);
+    height: var(--slide-h);
+    margin: 30px auto;
+    padding: 40px 50px;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card2) 100%);
+    box-shadow: 0 10px 40px rgba(0,0,0,.6);
+  }
+
+  .slide::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(135deg, var(--blue), var(--accent3), var(--accent));
+    border-radius: 18px;
+    z-index: -1;
+  }
+  
+  /* Cấu trúc mờ nền trang trí trí tuệ nhân tạo (mạng neural v.v) */
+  .bg-decorator {
+    position: absolute;
+    bottom: -40px;
+    right: -40px;
+    font-size: 300px;
+    opacity: 0.03;
+    z-index: 0;
+    pointer-events: none;
+  }
+  
+  .content-z {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== SLIDE NUMBER ===== */
+  .slide-num {
+    position: absolute;
+    bottom: 15px;
+    right: 30px;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 1px;
+    z-index: 10;
+  }
+
+  /* ===== TYPOGRAPHY ===== */
+  h1 {
+    font-size: 44px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 20%, var(--accent) 80%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+    position: relative;
+    padding-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  h2::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 60px; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--blue));
+    border-radius: 2px;
+  }
+
+  h3 { font-size: 20px; font-weight: 700; color: var(--accent); margin: 10px 0 8px; }
+
+  p, li { font-size: 17px; color: var(--text); }
+  li { margin-bottom: 6px; }
+  ul { padding-left: 20px; }
+
+  .subtitle { font-size: 22px; color: var(--text-muted); font-weight: 500; }
+
+  /* Bôi đậm nổi bật */
+  .highlight { color: var(--accent3); font-weight: 800; }
+  .green { color: var(--green); font-weight: 800; }
+  .gold { color: var(--gold); font-weight: 800; }
+  .blue { color: var(--blue); font-weight: 800; }
+  .cyan { color: var(--accent); font-weight: 800; }
+
+  /* ===== TABLES ===== */
+  table { border-collapse: collapse; width: 100%; font-size: 15px; background: rgba(255,255,255,0.02); border-radius: 6px; overflow: hidden; }
+  th {
+    background: rgba(102, 252, 241, 0.15);
+    color: var(--accent);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 16px;
+    border-bottom: 2px solid var(--accent);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.05); }
+
+  /* ===== CODE & FORMULAS ===== */
+  pre {
+    background: #05050f;
+    border: 1px solid rgba(102, 252, 241, 0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    color: #e0e6ed;
+  }
+  
+  .formula {
+    background: rgba(41, 182, 246, 0.1);
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 10px 0;
+    color: #fff;
+  }
+  .formula .hl-math { color: var(--gold); font-size: 20px; }
+  .formula .hl-math2 { color: var(--green); font-size: 20px; }
+
+  code { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent); }
+  .kw { color: #c792ea; }
+  .fn { color: #82aaff; }
+  .cm { color: #546e7a; font-style: italic; }
+  .str { color: #c3e88d; }
+  .num { color: #f78c6c; font-weight: 800; }
+  .op { color: #89ddff; font-weight: 800;}
+
+  /* ===== GRID LAYOUTS ===== */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; flex: 1; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(102, 252, 241, 0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+
+  /* Thay đổi thiết kế để TEXT TRONG TRẺO, RÕ RÀNG không mờ chữ */
+  .metric-card {
+    text-align: center;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .metric-card .val {
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--green); /* Sử dụng màu thuần túy, ko xài background gradient để PDF sắc nét */
+  }
+  .metric-card.blue-metric .val { color: var(--blue); }
+  .metric-card.white-metric .val { color: #ffffff; }
+
+  .metric-card .label { font-size: 14px; color: var(--text-muted); margin-top: 4px; font-weight: 600; text-transform: uppercase;}
+
+  /* ===== TAG / BADGE ===== */
+  .tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-right: 6px;
+    text-transform: uppercase;
+  }
+  .tag-red { background: rgba(233,69,96,.2); color: var(--accent3); border: 1px solid var(--accent3); }
+  .tag-green { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid var(--green); }
+  .tag-blue { background: rgba(41,182,246,.15); color: var(--blue); border: 1px solid var(--blue); }
+
+  /* ===== WORKFLOW 11 ===== */
+  .wf-container { display: flex; align-items: stretch; justify-content: space-between; width: 100%; gap: 12px; margin-top: 15px;}
+  .wf-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 15px 20px; /* Thu gọn padding để slide 11 ko chật */
+    position: relative;
+  }
+  .wf-step.s1 { border-color: var(--blue); }
+  .wf-step.s2 { border-color: var(--accent); }
+  .wf-step.s3 { border-color: var(--gold); }
+  
+  .wf-number {
+    position: absolute;
+    top: -15px; left: 15px;
+    width: 32px; height: 32px;
+    background: var(--bg-dark);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 800;
+    border: 2px solid;
+  }
+  .wf-step.s1 .wf-number { color: var(--blue); border-color: var(--blue); }
+  .wf-step.s2 .wf-number { color: var(--accent); border-color: var(--accent); }
+  .wf-step.s3 .wf-number { color: var(--gold); border-color: var(--gold); }
+
+  .wf-icon { font-size: 28px; text-align: center; margin-bottom: 10px; margin-top: 5px; }
+  .wf-title { font-size: 17px; font-weight: 800; text-align: center; margin-bottom: 12px; color: #fff;}
+  .wf-box {
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    border-left: 3px solid rgba(255,255,255,0.2);
+  }
+  .wf-box code { font-size: 13px; color: var(--green); }
+  
+  .wf-arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; color: var(--accent); font-weight: 800;
+  }
+
+  /* ===== CHECK LIST ===== */
+  .check { color: var(--green); margin-right: 6px; font-weight: bold; }
+
+  /* ===== TITLE SLIDE SPECIAL ===== */
+  .title-slide {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background: radial-gradient(circle at center, #1a1035 0%, #0a0a18 70%);
+  }
+  .title-icon { font-size: 60px; margin-bottom: 15px; text-shadow: 0 0 20px rgba(102, 252, 241, 0.5); }
+  .title-slide h1 {
+    font-size: 50px;
+    margin-bottom: 12px;
+  }
+  .title-slide .subtitle {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  
+  .members-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px 30px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px 30px;
+    border-radius: 12px;
+    border: 1px solid rgba(102, 252, 241, 0.3);
+    text-align: left;
+    margin-top: 20px;
+  }
+  .member-item {
+    font-size: 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed rgba(255,255,255,0.1);
+  }
+  .member-name { font-weight: 600; color: #fff; }
+  .member-id { font-family: 'JetBrains Mono'; color: var(--cyan); font-weight: 700; margin-left: 15px;}
+
+  /* ===== PRINT / PDF ===== */
+  @media print {
+    body { background: #fff; }
+    .slide {
+      margin: 0;
+      page-break-after: always;
+      page-break-inside: avoid;
+      border-radius: 0;
+      box-shadow: none;
+      width: 100vw;
+      height: 100vh;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .slide::before { display: none; }
+    .slide:last-child { page-break-after: avoid; }
+  }
+
+  @page {
+    size: 1280px 720px landscape;
+    margin: 0;
+  }
+
+  /* ===== MISC ===== */
+  .content { flex: 1; overflow: hidden; }
+  .small-text { font-size: 15px; }
+  .tiny-text { font-size: 13px; color: var(--text-muted); }
+  
+  /* Căn giữa bảng */
+  .table-wrapper { width: 100%; display: flex; justify-content: center;}
+</style>
+</head>
+<body>
+
+<!-- ==================== SLIDE 1 — TITLE ==================== -->
+<div class="slide title-slide">
+  <div class="bg-decorator">⚽</div>
+  <div class="content-z" style="align-items: center; justify-content: center;">
+    <div class="title-icon">🤖⚽</div>
+    <h1>Predicting English Premier League<br>Match Outcomes</h1>
+    <p class="subtitle">Logistic Regression from Scratch with Gradient Descent</p>
+    
+    <div style="font-size: 18px; color: var(--text-muted); margin-bottom: 10px;">
+      <strong>Course:</strong> Machine Learning &nbsp;|&nbsp; <strong>University:</strong> USTH &nbsp;|&nbsp; April 2026
+    </div>
+    
+    <div class="members-grid">
+      <div class="member-item">
+        <span class="member-name">Nghiêm Trọng Quốc Anh</span><span class="member-id">23BA14004</span>
+      </div>
+      <div class="member-item">
+        <span class="member-name">Lê Đức Anh</span><span class="member-id">23BA14005</span>
+      </div>
+      <div class="member-item">
+        <span class="member-name">Lương Quỳnh Anh</span><span class="member-id">23BA14008</span>
+      </div>
+      <div class="member-item">
+        <span class="member-name">Nguyễn Hải Anh</span><span class="member-id">23BA14002</span>
+      </div>
+      <div class="member-item">
+        <span class="member-name">Nguyễn Cao Việt Anh</span><span class="member-id">23BA14009</span>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">1 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 2 — AGENDA ==================== -->
+<div class="slide">
+  <div class="bg-decorator">📋</div>
+  <div class="content-z">
+    <h2>Agenda</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="three-col" style="width:100%;">
+        <div class="card">
+          <h3 style="font-size: 24px;">🎯 1. Foundation</h3>
+          <ul style="margin-top:15px; gap: 10px; display:flex; flex-direction:column;">
+            <li>Problem Statement</li>
+            <li>Algorithm Theory</li>
+            <li>L2 & Normalization</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="font-size: 24px;">📊 2. Data & Code</h3>
+          <ul style="margin-top:15px; gap: 10px; display:flex; flex-direction:column;">
+            <li>Dataset & Source</li>
+            <li>Feature Engineering</li>
+            <li>Evaluation Metrics</li>
+            <li><code>model.py</code> Walkthrough</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="font-size: 24px;">🚀 3. Results</h3>
+          <ul style="margin-top:15px; gap: 10px; display:flex; flex-direction:column;">
+            <li>Pipeline Workflow</li>
+            <li>Improvements & Results</li>
+            <li>Future Work</li>
+            <li>Conclusion</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">2 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 3 — PROBLEM STATEMENT ==================== -->
+<div class="slide">
+  <div class="bg-decorator">🎯</div>
+  <div class="content-z">
+    <h2>Problem Statement</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col" style="width:100%;">
+        <div>
+          <h3>📌 Classification Task</h3>
+          <p><strong>Binary Classification</strong> — predict whether the home team <span class="green">wins (1)</span> or <span class="highlight">does not win (0)</span></p>
+
+          <h3 style="margin-top:20px;">⚙️ Core Constraints</h3>
+          <ul>
+            <li>Build pure ML model <span class="cyan">from scratch</span></li>
+            <li>Use <span class="gold">NumPy only</span> (No scikit-learn)</li>
+            <li>Self-implemented Gradient Descent</li>
+          </ul>
+
+          <h3 style="margin-top:20px;">⚠️ Challenges</h3>
+          <ul>
+            <li>Football is inherently unpredictable</li>
+            <li>Data noise and class imbalance</li>
+          </ul>
+        </div>
+        
+        <div class="card" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+          <div style="font-size:60px; margin-bottom:10px;">🧠</div>
+          <div style="font-size:20px; font-weight:800; margin-bottom:15px; color:#fff;">Pre-Match Features</div>
+          <div style="font-size:30px; color:var(--accent);">↓</div>
+          
+          <div style="margin:10px 0; padding:15px 30px; background:linear-gradient(135deg, var(--blue), var(--accent3)); border-radius:10px; font-weight:800; font-size:22px;">
+            Logistic Regression
+          </div>
+          
+          <div style="font-size:30px; color:var(--accent);">↓</div>
+          <div style="margin-top:15px; display:flex; gap: 10px;">
+            <span class="tag tag-green" style="font-size:16px; padding:6px 16px;">Win (1)</span>
+            <span class="tag tag-red" style="font-size:16px; padding:6px 16px;">Not Win (0)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">3 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 4 — ALGORITHM ==================== -->
+<div class="slide">
+  <div class="bg-decorator">∑</div>
+  <div class="content-z">
+    <h2>Algorithm: Logistic Regression</h2>
+    <div class="content" style="display:flex; flex-direction:column; gap:15px; justify-content:center;">
+      <div class="two-col">
+        <div class="card">
+          <h3 style="margin-top:0;">1. Linear Score <span style="font-size:14px; color:var(--text-muted);">(<i>z</i>)</span></h3>
+          <div class="formula" style="font-size: 22px;">
+            $$ z = \theta_0 + \theta_1 x_1 + \dots + \theta_n x_n = \theta^T x $$
+          </div>
+          <p class="small-text" style="color:var(--text-muted);">Combines features (<i>x</i>) with learned weights (θ)</p>
+          
+          <h3 style="margin-top:15px;">2. Sigmoid Activation <span style="font-size:14px; color:var(--text-muted);">(Probability)</span></h3>
+          <div class="formula" style="font-size: 22px;">
+            $$ \hat{y} = \sigma(z) = \frac{1}{1 + e^{-z}} $$
+          </div>
+          <p class="small-text" style="color:var(--text-muted);">Squashes the score <i>z</i> into probability range [0, 1]</p>
+        </div>
+        
+        <div class="card">
+          <h3 style="margin-top:0;">3. Log Loss <span style="font-size:14px; color:var(--text-muted);">(Cost Function <i>J</i>)</span></h3>
+          <div class="formula" style="font-size: 20px;">
+            $$ J(\theta) = -\frac{1}{m} \sum_{i=1}^m \left[ y^{(i)} \log(\hat{y}^{(i)}) + (1-y^{(i)}) \log(1-\hat{y}^{(i)}) \right] $$
+          </div>
+          <p class="small-text" style="color:var(--text-muted);">Penalizes wrong predictions exponentially</p>
+
+          <h3 style="margin-top:15px;">4. Gradient Descent <span style="font-size:14px; color:var(--text-muted);">(Update)</span></h3>
+          <div class="formula" style="font-size: 22px;">
+            $$ \theta_j := \theta_j - \alpha \frac{\partial J}{\partial \theta_j} $$
+          </div>
+          <p class="small-text" style="color:var(--text-muted);">α = learning rate, iteratively minimizes cost</p>
+        </div>
+      </div>
+      
+      <div style="text-align:center; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px; border:1px solid rgba(102,252,241,0.3);">
+        <p style="font-size: 18px; font-weight:bold;">
+          <span class="cyan">Decision Rule:</span> &nbsp; 
+          IF ŷ ≥ <span class="gold">threshold</span> → <span class="green">Predict Win (1)</span> 
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          ELSE → <span class="highlight">Predict Not Win (0)</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">4 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 5 — L2 & NORMALIZATION ==================== -->
+<div class="slide">
+  <div class="bg-decorator">⚖️</div>
+  <div class="content-z">
+    <h2>L2 Regularization & Normalization</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col" style="align-items:stretch;">
+        <div class="card">
+          <div style="font-size:36px; margin-bottom:5px;">🛡️</div>
+          <h3 style="margin-top:0;">L2 Regularization</h3>
+          <p style="margin-bottom:10px;">Adds penalty for <strong>large weights</strong> to prevent model from memorizing noise (overfitting).</p>
+          
+          <div class="formula" style="font-size: 22px;">
+            $$ J_{reg}(\theta) = J(\theta) + \frac{\lambda}{2m} \sum_{j=1}^n \theta_j^2 $$
+          </div>
+          
+          <ul style="margin-top:15px;">
+            <li>Controls model complexity</li>
+            <li><span class="gold">λ (lambda)</span> = regularization strength</li>
+            <li>Gradient updated: <code>dw += (λ/m) · w</code></li>
+          </ul>
+        </div>
+        
+        <div class="card">
+          <div style="font-size:36px; margin-bottom:5px;">📏</div>
+          <h3 style="margin-top:0;">Min-Max Normalization</h3>
+          <p style="margin-bottom:10px;">Scales disparate features into the same standard range <span class="green">[0, 1]</span>.</p>
+          
+          <div class="formula" style="font-size: 22px;">
+            $$ X_{norm} = \frac{X - X_{min}}{X_{max} - X_{min}} $$
+          </div>
+          
+          <ul style="margin-top:15px;">
+            <li><strong>Crucial:</strong> Parameters fit on <span class="cyan">Train set</span> only!</li>
+            <li>Applied symmetrically to Test set</li>
+            <li>Ensures stable and fast Gradient Descent</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">5 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 6 — DATASET ==================== -->
+<div class="slide">
+  <div class="bg-decorator">📁</div>
+  <div class="content-z">
+    <h2>Dataset & Preparation</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col">
+        <div>
+          <h3 style="font-size: 22px;">🌐 Data Source</h3>
+          <ul>
+            <li><strong>football-data.co.uk</strong> (official EPL results)</li>
+            <li>Aggregated over multiple seasons (<span class="cyan">2017/18 → 2025/26</span>)</li>
+          </ul>
+
+          <h3 style="font-size: 22px; margin-top:20px;">📊 Raw Columns</h3>
+          <table>
+            <tr><th>Variable</th><th>Description</th></tr>
+            <tr><td><code>Date</code>, <code>Teams</code></td><td>Match identifiers</td></tr>
+            <tr><td><code>FTR</code></td><td>Full-Time Result (H/D/A)</td></tr>
+            <tr><td><code>FTHG/FTAG</code></td><td>Goals scored</td></tr>
+            <tr><td><code>B365H, PSH</code></td><td>Live betting odds</td></tr>
+          </table>
+        </div>
+        
+        <div class="card" style="display:flex; flex-direction:column; justify-content:center;">
+          <h3 style="font-size: 22px; text-align:center;">🔀 Train / Test Split Model</h3>
+          
+          <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius:10px; margin-top: 10px; border-left: 4px solid var(--blue);">
+            <p style="font-weight: 800; font-size: 18px; color:var(--blue);">Mode: Season-Based Split</p>
+            <p style="margin-top:5px; font-size: 16px;"><strong>Train:</strong> All historical seasons</p>
+            <p style="margin-top:5px; font-size: 16px;"><strong>Test:</strong> Latest season <span class="gold">2025/26</span> (~1,430 matches)</p>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius:10px; margin-top: 15px; border-left: 4px solid var(--green);">
+            <p style="font-weight: 800; font-size: 18px; color:var(--green);">Target Label Mapping</p>
+            <p style="margin-top:5px; font-size: 16px;"><code>target = 1</code> &nbsp;←&nbsp; <code>FTR = "H"</code></p>
+            <p style="margin-top:5px; font-size: 16px;"><code>target = 0</code> &nbsp;←&nbsp; <code>FTR = "D" | "A"</code></p>
+          </div>
+          
+          <p class="small-text" style="color:var(--gold); text-align:center; margin-top:15px; font-weight:bold;">
+            * Simulates real-world robust scenario
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">6 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 7 — FEATURES ==================== -->
+<div class="slide">
+  <div class="bg-decorator">⚡</div>
+  <div class="content-z">
+    <h2>Feature Engineering (8 Inputs)</h2>
+    <div class="content" style="display: flex; flex-direction:column; justify-content: space-between;">
+      <div class="table-wrapper">
+        <table style="font-size: 15px;">
+          <tr><th>Feature</th><th>Math Formula / Logic</th><th>Intuitive Meaning</th></tr>
+          <tr><td><code style="font-size: 14px;">RankDiff</code></td><td> rank_away − rank_home</td><td>League standings gap</td></tr>
+          <tr><td><code style="font-size: 14px;">WinRateDiff</code></td><td> W/Played (home) − (away)</td><td>Historical win efficiency</td></tr>
+          <tr><td><code style="font-size: 14px;">PPGDiff</code></td><td> Pts/Played (home) − (away)</td><td>Points-per-game difference</td></tr>
+          <tr><td><code style="font-size: 14px; color: var(--gold);">ELODiff</code></td><td> elo_h − elo_a <span style="font-size:12px;">(K=20)</span></td><td>Dynamic strength rating</td></tr>
+          <tr><td><code style="font-size: 14px;">RecentFormDiff</code></td><td> sum(last 3: W=1,D=0,L=-1)</td><td>Short-term momentum</td></tr>
+          <tr><td><code style="font-size: 14px;">RestDaysDiff</code></td><td> rest_days_home − away</td><td>Physical fatigue factor</td></tr>
+          <tr><td><code style="font-size: 14px; color: var(--green);">MarketProbDiff</code></td><td> (1/odd_h) − (1/odd_a)</td><td>Bookmaker aggregated wisdom</td></tr>
+          <tr><td><code style="font-size: 14px;">HomeAdvantage</code></td><td> constant = 1</td><td>Bias for home stadium</td></tr>
+        </table>
+      </div>
+      
+      <div class="card" style="margin-top: 15px; padding: 12px 20px; border-color: var(--green); display:flex; align-items:center; gap: 15px;">
+        <div style="font-size:24px;">🛡️</div>
+        <div>
+          <p style="font-size:18px; font-weight:800; color:var(--green);">Strict Anti-Leakage Policy</p>
+          <p style="font-size:15px;">All features are computed <strong>STRICTLY BEFORE</strong> kickoff using cumulative history arrays.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">7 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 8 — METRICS ==================== -->
+<div class="slide">
+  <div class="bg-decorator">📈</div>
+  <div class="content-z">
+    <h2>Evaluation Metrics</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col">
+        <div>
+          <table style="font-size:16px;">
+            <tr><th>Metric Overview</th><th>Formula</th></tr>
+            <tr><td><strong>Accuracy</strong></td><td><span class="cyan">TP + TN</span> / Total</td></tr>
+            <tr><td><strong>Precision</strong></td><td>TP / (<span class="gold">TP + FP</span>)</td></tr>
+            <tr><td><strong>Recall</strong></td><td>TP / (<span class="highlight">TP + FN</span>)</td></tr>
+            <tr><td><strong>F1 Score</strong></td><td>2PR / (P + R)</td></tr>
+          </table>
+          <div class="card" style="margin-top:20px; border-color:var(--gold);">
+            <h3 style="margin-top:0; color:var(--gold);">⚖️ The Threshold Trade-off</h3>
+            <p style="margin-top:5px; font-size:15px;">Adjusting the decision boundary changes everything:</p>
+            <ul style="margin-top:10px; font-weight: bold; font-size: 15px;">
+              <li>↑ High Threshold = Better <span class="cyan">Precision</span>, Worse Recall</li>
+              <li>↓ Low Threshold = Better <span class="green">Recall</span>, Worse Precision</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div>
+          <h3 style="text-align:center; font-size:22px; margin-bottom:10px;">Confusion Matrix</h3>
+          <table style="text-align:center; background:rgba(0,0,0,0.5);">
+            <tr><th style="background:transparent; border:none;"></th><th style="text-align:center; background:rgba(41,182,246,0.2);">Pred: Win</th><th style="text-align:center; background:rgba(233,69,96,0.2);">Pred: Not Win</th></tr>
+            <tr><td style="font-weight:800; background:rgba(0,230,118,0.1);">Actual: Win</td><td style="font-size:24px;"><span class="green">TP</span></td><td style="font-size:24px;"><span class="highlight">FN</span></td></tr>
+            <tr><td style="font-weight:800; background:rgba(255,215,0,0.1);">Actual: Not Win</td><td style="font-size:24px;"><span class="highlight">FP</span></td><td style="font-size:24px;"><span class="gold">TN</span></td></tr>
+          </table>
+          
+          <div class="card" style="margin-top:20px; text-align:center;">
+            <p style="font-size:17px;"><span class="cyan">Precision:</span> "When we yell WIN, how often are we right?"</p>
+            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:10px 0;">
+            <p style="font-size:17px;"><span class="green">Recall:</span> "Of all actual WINS, how many did we catch?"</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">8 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 9 — ARCHITECTURE ==================== -->
+<div class="slide">
+  <div class="bg-decorator">🏗️</div>
+  <div class="content-z">
+    <h2>Code Architecture</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col">
+        <div>
+          <pre style="font-size:14px; line-height:1.6; padding: 15px;">
+<span class="str">project-machine-learning/</span>
+├── <span class="fn">data/</span>
+│   ├── data-raw/              <span class="cm"># Raw EPL CSVs</span>
+│   └── epl_real_features.csv  
+├── <span class="fn">src/</span>
+│   ├── prepare_real_data.py   <span class="cm"># Gen features</span>
+│   ├── preprocessing.py       <span class="cm"># MinMax Setup</span>
+│   ├── <span class="kw" style="font-weight:800;">model.py</span>               <span class="cm"># Core Logic</span>
+│   ├── metrics.py             <span class="cm"># Evaluation</span>
+│   ├── train.py               <span class="cm"># Training loop</span>
+│   ├── evaluate_thresholds.py <span class="cm"># Sweeper</span>
+│   └── tune_hyperparams.py    <span class="cm"># Grid searcher</span>
+├── <span class="fn">outputs/</span>                   
+├── Dockerfile
+└── docker-compose.yml</pre>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:15px;">
+          <div class="card" style="border-left: 4px solid var(--accent);">
+            <h3 style="margin-top:0; font-size: 20px;">🔑 Key Design Pattern</h3>
+            <p style="font-size: 16px;">Highly modularized scripts. Object-Oriented wrapping for Models and Scalers.</p>
+          </div>
+          
+          <div class="card" style="border-left: 4px solid var(--blue);">
+            <h3 style="margin-top:0; font-size: 20px;">📂 Separation of Concerns</h3>
+            <ul style="font-size: 16px; font-weight:600;">
+              <li><span class="green">Data Prep</span> is decoupled from <span class="cyan">Training</span>.</li>
+              <li><span class="gold">Tuning Grid</span> relies on reusable blocks.</li>
+            </ul>
+          </div>
+          
+          <div class="card" style="border-left: 4px solid var(--green);">
+            <h3 style="margin-top:0; font-size: 20px;">🐳 Infrastructure</h3>
+            <p style="font-size: 16px;">Packaged standardly:<br><code>docker compose run --rm epl</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">9 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 10 — MODEL.PY WALKTHROUGH ==================== -->
+<div class="slide">
+  <div class="bg-decorator">💻</div>
+  <div class="content-z">
+    <h2>Algorithm Implementation (model.py)</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col">
+        <div style="display:flex; flex-direction: column; gap: 15px;">
+          <div class="card" style="padding: 10px 15px;">
+            <h3 style="margin-top:0; margin-bottom:5px; font-size: 18px; color:var(--cyan);">1. Sigmoid Function</h3>
+            <pre style="padding:10px; font-size: 13px;"><span class="kw">@staticmethod</span>
+<span class="kw">def</span> <span class="fn">_sigmoid</span>(z):
+    z = np.clip(z, <span class="num">-500</span>, <span class="num">500</span>) <span class="cm"># No overflow</span>
+    <span class="kw">return</span> <span class="num">1.0</span> / (<span class="num">1.0</span> + np.exp(-z))</pre>
+          </div>
+
+          <div class="card" style="padding: 10px 15px;">
+            <h3 style="margin-top:0; margin-bottom:5px; font-size: 18px; color:var(--gold);">2. Log Loss Calculation</h3>
+            <pre style="padding:10px; font-size: 13px;"><span class="kw">@staticmethod</span>
+<span class="kw">def</span> <span class="fn">_log_loss</span>(y_true, y_pred):
+    eps = <span class="num">1e-12</span>
+    p = np.clip(y_pred, eps, <span class="num">1</span>-eps) <span class="cm"># No log(0)</span>
+    <span class="kw">return</span> -np.mean(
+      y_true * np.log(p) + (<span class="num">1</span>-y_true) * np.log(<span class="num">1</span>-p)
+    )</pre>
+          </div>
+        </div>
+        
+        <div class="card" style="padding: 15px 20px; border-color: var(--green);">
+          <h3 style="margin-top:0; margin-bottom:5px; font-size: 18px; color:var(--green);">3. Gradient Descent Loop + L2</h3>
+          <pre style="padding:10px; font-size: 13px; line-height: 1.4;"><span class="kw">def</span> <span class="fn">fit</span>(self, x, y):
+    <span class="cm"># Init weights</span>
+    self.w, self.b = np.zeros(x.shape[<span class="num">1</span>]), <span class="num">0.0</span>
+
+    <span class="kw">for</span> _ <span class="kw">in</span> range(self.epochs):
+      <span class="cm"># Forward probs</span>
+      p = self._sigmoid(np.dot(x, self.w) + self.b)
+
+      <span class="cm"># Raw gradients</span>
+      dw = (<span class="num">1</span>/m) * np.dot(x.T, (p - y))
+      db = (<span class="num">1</span>/m) * np.sum(p - y)
+
+      <span class="cm"># Apply L2</span>
+      <span class="kw">if</span> self.l2 > <span class="num">0</span>: dw += (self.l2/m) * self.w
+
+      <span class="cm"># Update</span>
+      self.w -= self.lr * dw
+      self.b -= self.lr * db</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">10 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 11 — PIPELINE WORKFLOW ==================== -->
+<div class="slide">
+  <div class="bg-decorator">🔄</div>
+  <div class="content-z">
+    <h2>End-to-End Workflow</h2>
+    <div class="content" style="display:flex; flex-direction:column; justify-content:center;">
+      
+      <div class="wf-container">
+        
+        <!-- STEP 1 -->
+        <div class="wf-step s1">
+          <div class="wf-number">1</div>
+          <div class="wf-icon">📥</div>
+          <div class="wf-title">Data Ingestion</div>
+          <p style="text-align:center; margin-bottom:10px; font-size:13px; color:var(--text-muted);"><code>football-data.co.uk</code></p>
+          <div class="wf-box">Parse dates & std names</div>
+          <div class="wf-box">Accumulate form & Elo</div>
+          <div class="wf-box"><code style="font-weight:bold;">epl_real_features.csv</code></div>
+        </div>
+
+        <div class="wf-arrow">→</div>
+
+        <!-- STEP 2 -->
+        <div class="wf-step s2">
+          <div class="wf-number">2</div>
+          <div class="wf-icon">⚙️</div>
+          <div class="wf-title">Training Focus</div>
+          <p style="text-align:center; margin-bottom:10px; font-size:13px; color:var(--text-muted);"><code>train.py</code></p>
+          <div class="wf-box">Season-based split</div>
+          <div class="wf-box">Min-Max fit on Train</div>
+          <div class="wf-box">Gradient Descent loop</div>
+        </div>
+
+        <div class="wf-arrow">→</div>
+
+        <!-- STEP 3 -->
+        <div class="wf-step s3">
+          <div class="wf-number">3</div>
+          <div class="wf-icon">🎯</div>
+          <div class="wf-title">Optimization</div>
+          <p style="text-align:center; margin-bottom:10px; font-size:13px; color:var(--text-muted);"><code>tune_hyperparams.py</code></p>
+          <div class="wf-box">Sweep Thresholds</div>
+          <div class="wf-box">180 Config Grid Search</div>
+          <div class="wf-box" style="color:var(--gold); font-weight:bold;">Find Best Accuracy</div>
+        </div>
+
+      </div>
+
+      <div class="card" style="margin-top: 25px; border-color: var(--green); text-align: center; padding: 15px;">
+        <h3 style="margin:0; font-size:20px;"><span style="font-size:24px;">📊</span> Step 4: Output Generation</h3>
+        <p style="font-size:16px; font-weight:600; margin-top:8px; color: #fff;">
+          Generated artifacts: <code style="color:var(--cyan); background:transparent; border:none; padding:0;">model_weights.json</code> , <code style="color:var(--gold); background:transparent; border:none; padding:0;">metrics.json</code> , <code style="color:var(--green); background:transparent; border:none; padding:0;">predictions.csv</code>
+        </p>
+      </div>
+
+    </div>
+  </div>
+  <span class="slide-num">11 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 12 — IMPROVEMENTS & RESULTS ==================== -->
+<div class="slide">
+  <div class="bg-decorator">🏆</div>
+  <div class="content-z">
+    <h2>Improvements & Final Results</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="two-col">
+        <!-- Left: Journey -->
+        <div>
+          <h3 style="font-size: 20px;">📈 Development Journey</h3>
+          <table style="margin-top:10px; font-size: 14px;">
+            <tr><th>Version</th><th>Key Action Taken</th></tr>
+            <tr><td><span class="tag tag-blue">v1. Base</span></td><td>Minimal features, threshold = 0.5</td></tr>
+            <tr><td><span class="tag tag-blue">v2. Feat</span></td><td>Injected Elo + Bookmaker odds</td></tr>
+            <tr><td><span class="tag tag-blue">v3. Thresh</span></td><td>Swept threshold curve → optimized recall</td></tr>
+            <tr><td><span class="tag tag-blue">v4. Tune</span></td><td>180 configs Grid Search</td></tr>
+            <tr><td><span class="tag tag-green">v5. Final</span></td><td>Season strict split (Test on 25/26)</td></tr>
+          </table>
+
+          <h3 style="margin-top:20px; font-size:20px;">⭐ Top 3 Vital Features</h3>
+          <table style="background: rgba(0,0,0,0.4); font-size: 14px;">
+            <tr><th>Feature</th><th>Learned Weight</th></tr>
+            <tr><td><strong class="cyan">MarketImpliedProbDiff</strong></td><td><span class="green" style="font-size:20px; font-weight:900;">2.755</span> <span style="font-size:12px;">(Dominant)</span></td></tr>
+            <tr><td><strong>RankDiff</strong></td><td><span class="gold" style="font-weight:bold;">0.696</span></td></tr>
+            <tr><td><strong>ELODiff</strong></td><td>0.325</td></tr>
+          </table>
+        </div>
+
+        <!-- Right: Metrics -->
+        <div style="display:flex; flex-direction:column; justify-content:center;">
+          <h3 style="font-size: 22px; text-align:center;">🔥 Test Set Performance (Season 25/26)</h3>
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px;">
+            <div class="metric-card" style="border: 2px solid var(--green);">
+              <div class="val" style="font-size: 44px; color: var(--green);">65.94%</div>
+              <div class="label" style="font-size: 16px;">Master Accuracy</div>
+            </div>
+            <div class="metric-card blue-metric">
+              <div class="val" style="font-size: 36px; color: var(--blue);">0.608</div>
+              <div class="label">Log Loss Target</div>
+            </div>
+          </div>
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px;">
+            <div class="metric-card white-metric" style="padding: 12px;">
+              <div class="val" style="font-size: 28px;">63.0%</div>
+              <div class="label">Precision</div>
+            </div>
+            <div class="metric-card white-metric" style="padding: 12px;">
+              <div class="val" style="font-size: 28px;">56.1%</div>
+              <div class="label">Recall</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">12 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 13 — FUTURE WORK ==================== -->
+<div class="slide">
+  <div class="bg-decorator">🔮</div>
+  <div class="content-z">
+    <h2>Future Development</h2>
+    <div class="content" style="display:flex; align-items:center;">
+      <div class="three-col" style="width:100%;">
+        
+        <div class="card" style="border-top:5px solid var(--green); display:flex; flex-direction:column;">
+          <div style="font-size:40px; text-align:center; margin-bottom:10px;">📊</div>
+          <h3 style="text-align:center; color:var(--green); font-size:22px;">1. Advanced Stats</h3>
+          <ul style="margin-top:10px; flex:1; font-size:15px;">
+            <li>Incorporate <strong>xG</strong> (Expected Goals) metrics.</li>
+            <li>Add Match Possession & Shots on Target stats.</li>
+            <li>Capture hidden team qualities.</li>
+          </ul>
+          <div class="tag tag-green" style="text-align:center; margin-top:15px;">Impact: High</div>
+        </div>
+
+        <div class="card" style="border-top:5px solid var(--blue); display:flex; flex-direction:column;">
+          <div style="font-size:40px; text-align:center; margin-bottom:10px;">⚖️</div>
+          <h3 style="text-align:center; color:var(--blue); font-size:22px;">2. Class Balancing</h3>
+          <ul style="margin-top:10px; flex:1; font-size:15px;">
+            <li>Integrate <strong>Class Weights</strong> directly into Cost Function.</li>
+            <li>Address structural label imbalance natively.</li>
+            <li>Boosts minority class recall.</li>
+          </ul>
+          <div class="tag tag-blue" style="text-align:center; margin-top:15px;">Impact: Medium</div>
+        </div>
+
+        <div class="card" style="border-top:5px solid var(--gold); display:flex; flex-direction:column;">
+          <div style="font-size:40px; text-align:center; margin-bottom:10px;">🌐</div>
+          <h3 style="text-align:center; color:var(--gold); font-size:22px;">3. Smart Search</h3>
+          <ul style="margin-top:10px; flex:1; font-size:15px;">
+            <li>Replace brute Grid Search with <strong>Bayesian Optimization</strong>.</li>
+            <li>Much faster parameter convergence.</li>
+            <li>Enables searching continuous spaces.</li>
+          </ul>
+          <div class="tag tag-red" style="text-align:center; margin-top:15px;">Impact: High Efficiency</div>
+        </div>
+
+      </div>
+    </div>
+    <p style="text-align:center; margin-top:20px; font-size: 16px; font-weight:bold; color:var(--cyan);">
+      * All keep Logistic Regression as core — purely improving Data Signal & Optimization Strategy.
+    </p>
+  </div>
+  <span class="slide-num">13 / 14</span>
+</div>
+
+<!-- ==================== SLIDE 14 — CONCLUSION ==================== -->
+<div class="slide title-slide" style="text-align:left; align-items:flex-start; padding:50px 70px;">
+  <div class="bg-decorator" style="bottom:-80px; right:-80px; opacity: 0.05;">🏁</div>
+  <div class="content-z" style="display:flex; flex-direction:column; justify-content:center; width:100%;">
+    
+    <h2 style="text-align:left; font-size: 38px; margin-bottom: 25px;">Conclusion</h2>
+    
+    <div class="two-col" style="width:100%;">
+      <div>
+        <h3 style="font-size: 26px; margin-bottom: 15px;">✓ What We Achieved</h3>
+        <ul style="font-size: 20px; gap: 8px; display:flex; flex-direction:column;">
+          <li>Built mathematical foundation <strong>completely from scratch</strong> (No APIs).</li>
+          <li>Engineered 8 complex contextual pre-match features.</li>
+          <li>Achieved rigid testing <span class="green" style="font-size: 24px;">Accuracy of 65.94%</span></li>
+          <li>Systematic & reproducible pipeline.</li>
+        </ul>
+      </div>
+      
+      <div>
+        <h3 style="font-size: 26px; margin-bottom: 15px;">💡 Key Takeaways</h3>
+        <div class="card" style="background: rgba(41,182,246,0.1); border-color: var(--blue);">
+          <p style="font-size: 20px; line-height: 1.5;">Even a fundamental algorithm like Logistic Regression achieves <strong>highly competitive real-world bounds</strong> when:</p>
+          <ul style="margin-top:10px; font-size: 20px; font-weight: bold;">
+            <li>Features isolate the right signals.</li>
+            <li>Regularization is applied.</li>
+            <li>Evaluation mirrors reality.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top:50px;">
+      <div style="font-size:50px; margin-bottom: 10px; text-shadow: 0 0 20px var(--accent);">🚀</div>
+      <p style="font-size:32px; font-weight:800; background:linear-gradient(135deg, var(--gold), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Thank you for listening! Questions?</p>
+    </div>
+    
+  </div>
+  <span class="slide-num">14 / 14</span>
+</div>
+
+</body>
+</html>
